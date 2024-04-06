@@ -1,24 +1,41 @@
 import argparse
-
+from sklearn.metrics import confusion_matrix
+import pandas as pd
+import seaborn as sn
+import matplotlib.pyplot as plt
 
 def list2dict(lines):
     dict = {}
     for line in lines:
         spl = line.split(",")
-        dict[spl[0]] = spl[1]
+        if spl[0] != "filename":
+            dict[spl[0]] = spl[1]
     return dict
 
 
 def comp(r,p):
+    y_true = []
+    y_pred = []
     real_dict = list2dict(r)
     pred_dict = list2dict(p)
-    count =-1
+    count =0
     for key in pred_dict:
         if key in real_dict:
             if real_dict[key]==pred_dict[key]:
                 print(key)
                 count = count+1
-    accuracy = count/(len(pred_dict)-1)
+            y_true.append(real_dict[key])
+            y_pred.append(pred_dict[key])
+
+    data = {'y_actual':y_true,
+            'y_predicted': y_pred}
+    df = pd.DataFrame(data)
+    confusion_m = pd.crosstab(df['y_actual'], df['y_predicted'], rownames=['Actual'], colnames=['Predicted'])
+    sn.heatmap(confusion_m, annot=True)
+    plt.show()
+
+    accuracy = count/(len(pred_dict))
+
     return accuracy
 
 

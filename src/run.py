@@ -6,8 +6,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 from skimage.filters import try_all_threshold,threshold_otsu,threshold_yen,threshold_local
 from skimage import measure, morphology,img_as_ubyte
-from skimage.color import label2rgb
-from scipy.ndimage import convolve
 import os
 
 
@@ -45,47 +43,61 @@ def thresholding(image):
     thresh = threshold_yen(image[:,:,1])
     bin2 = image[:,:,1] > thresh
     im = np.logical_and(bin1,bin2)
-    # im = (im.astype(int)+1)%2
 
     block_size = 11
     binary_adaptive = image[:,:,0] > threshold_local(image[:,:,0], block_size)
     im = np.logical_or(im,binary_adaptive)
     im = (im.astype(int)+1)%2
 
-    # plt.subplot(121)
-    # plt.imshow(binary_adaptive)
-    # plt.subplot(122)
-    # plt.imshow(im)
-    # plt.show()
-    #TODO dilatace s necox1 kernelem na obe strany - spojit cary pokus?
-
-
     labelled = morphology.label(im)
-    # plt.imshow(labelled)
-    # plt.show()
-
     rp = measure.regionprops(labelled)
     size = [i.area for i in rp]
     size.sort()
     try:
-        out = morphology.remove_small_objects(im.astype(bool), min_size=size[-2]+1)
+        out = morphology.remove_small_objects(im.astype(bool), min_size=size[-1]*0.8)
     except IndexError:
         out = im
-    # TODO rozhodnout podle velikosti kolik nechat objektu (kdyz se incision rozpuli)
-    # plt.imshow(out)
-    # plt.show()
+    # TODO rozhodnout podle velikosti kolik nechat objektu (kdyz se incision rozpuli) / pokusit se spojit pres krajni body
     return out
-
 
 
 def kostra(im):
     im = morphology.skeletonize(im)
     kernel = np.ones((5,5))
-    im_neigh = convolve(im, kernel)
-    im_neigh = morphology.skeletonize(im_neigh)
-    # plt.imshow(im_neigh)
-    # plt.show()
-    return im_neigh
+    im = morphology.binary_dilation(im, kernel)
+    im = morphology.skeletonize(im)
+    return im
+
+
+def min_neighbor(im, x,y):
+    vyrez = im[x-1:x+2,y-1:y+2].copy()
+    vyrez[1,1] =100
+    # print(vyrez)
+    return np.argmin(vyrez)#0-8 mimo 4 #TODO preferovat cestu doprava
+
+
+def posun(index):
+    i_posun=int(index%3) -1
+    j_posun=int(index/3) -1
+    return i_posun,j_posun
+
+
+def find_path(im, bod1,bod2):
+    im = im/255
+    c = np.zeros_like(im)
+    c[im == 0] = 100
+    pozice = (bod1[0]+1,bod1[1]+1)
+    bod2 = (bod2[0]+1,bod2[1]+1)
+    c[pozice] = 1
+    cesta = np.zeros((im.shape[0]+2,im.shape[1]+2))
+    cesta = cesta +100
+    cesta[1:-1,1:-1] = c
+    while pozice != bod2:
+        cesta[pozice] = cesta[pozice] + 1
+        i,j = posun(min_neighbor(cesta, pozice[0],pozice[1]))
+        # print(i,j,pozice)
+        pozice = (pozice[0]+j,pozice[1]+i)
+    return cesta[1:-1,1:-1]
 
 def remove_incision(im):
     yy, xx= np.nonzero(im)
@@ -94,28 +106,11 @@ def remove_incision(im):
         index_vlevo = np.argmin(xx) #levy bod
     except ValueError:
         return im #prazdny obraz, nebude se nic delat
-    # print(xx[index_vlevo])
-    # print(xx[index_vpravo])
-    # print(yy[index_vlevo])
-    # print(yy[index_vpravo])
 
-    ix =min(xx[index_vlevo],xx[index_vpravo])
-    ix2=max(xx[index_vlevo],xx[index_vpravo])
-    iy =min(yy[index_vlevo],yy[index_vpravo])
-    iy2=max(yy[index_vlevo],yy[index_vpravo])
+    im[find_path(img_as_ubyte(im), (yy[index_vlevo],xx[index_vlevo]), (yy[index_vpravo],xx[index_vpravo]))==1] = 0
 
-    # plt.imshow(im)
-    # plt.show()
-
-    im[iy:iy2+1, ix:ix2+1] = 0 # TODO inteligentnejsi vymazani pouze incize
-
-    # plt.imshow(im)
-    # plt.show()
-
-    kernel = np.ones((10,3))
+    kernel = np.ones((3,3))
     im = morphology.binary_dilation(im, kernel)
-    # plt.imshow(im)
-    # plt.show()
 
     labelled = morphology.label(im)
     rp = measure.regionprops(labelled)
@@ -125,10 +120,6 @@ def remove_incision(im):
         out = morphology.remove_small_objects(im.astype(bool), min_size=size[-1]*0.66)
     else:
         out = im
-
-    # plt.imshow(out)
-    # plt.show()
-
     return out
 
 if __name__ == "__main__":
@@ -139,10 +130,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
     out_file = args.out
     in_files = args.input
-    if args.v:
-        print("visual mode")
-    print(out_file)
-    print(in_files)
 
     output = {}
     # for im in in_files:#obrazky z args
@@ -150,21 +137,25 @@ if __name__ == "__main__":
     #     # threshold_test(img)
     #     img = thresholding(img)
     #     img = kostra(img)
+    #     labels, num = morphology.label(img, return_num=True)
+    #     if num ==1:
+    #         img = remove_incision(img)
+    #         skimage.io.imsave("../images/incisionless/"+im, img_as_ubyte(img))
     #     img = remove_incision(img)
-    #     labels, num = morphology.label(img, return_num = True)
+    #     labels, num = morphology.label(img, return_num=True)
     #     output[im] = num
-
 
     for im in os.listdir("../images/incision_couples/"):#vsechny obrazky
         img = skimage.io.imread("../images/incision_couples/" + im)
         img = thresholding(img)
         img = kostra(img)
         skimage.io.imsave("../images/skeletons/"+im, img_as_ubyte(img))
-        img = remove_incision(img)
-        skimage.io.imsave("../images/incisionless/"+im, img_as_ubyte(img))
+        labels, num = morphology.label(img, return_num=True)
+        if num ==1:# TODO vyresit rozpulene incize (nebo je predem spojit)
+            img = remove_incision(img)
+            skimage.io.imsave("../images/incisionless/"+im, img_as_ubyte(img))
         labels, num = morphology.label(img, return_num=True)
         output[im] = num
 
-
-    # output = {"incision000.jpg": 5,"incision001.jpg": 2, "incision003.jpg": 0, "incision002.jpg": -1}
     write_output(out_file, output)
+
