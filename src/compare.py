@@ -1,8 +1,8 @@
 import argparse
-from sklearn.metrics import confusion_matrix
 import pandas as pd
 import seaborn as sn
 import matplotlib.pyplot as plt
+import skimage
 
 def list2dict(lines):
     dict = {}
@@ -21,11 +21,18 @@ def comp(r,p):
     count =0
     for key in pred_dict:
         if key in real_dict:
-            if real_dict[key]==pred_dict[key]:
+            if real_dict[key] == pred_dict[key]:
                 print(key)
                 count = count+1
+            # else:
+            #     img= skimage.io.imread("../images/visualization/" + key.split(".")[0]+".png")
+            #     plt.imshow(img)
+            #     plt.title("actual: "+str(real_dict[key])+"predicted: "+str(pred_dict[key]))
+            #     plt.show()
             y_true.append(real_dict[key])
             y_pred.append(pred_dict[key])
+
+    accuracy = count/(len(pred_dict))
 
     data = {'y_actual':y_true,
             'y_predicted': y_pred}
@@ -33,8 +40,6 @@ def comp(r,p):
     confusion_m = pd.crosstab(df['y_actual'], df['y_predicted'], rownames=['Actual'], colnames=['Predicted'])
     sn.heatmap(confusion_m, annot=True)
     plt.show()
-
-    accuracy = count/(len(pred_dict))
 
     return accuracy
 
