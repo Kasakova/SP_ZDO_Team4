@@ -22,7 +22,7 @@ def comp(r,p):
     for key in pred_dict:
         if key in real_dict:
             if real_dict[key] == pred_dict[key]:
-                print(key)
+                # print(key)
                 count = count+1
             # else:
             #     img= skimage.io.imread("../images/visualization/" + key.split(".")[0]+".png")
