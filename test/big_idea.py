@@ -57,7 +57,7 @@ def count_unique_objects(binary_image):
     centroids = []
     
     # Prahová hodnota pro porovnávání souřadnic x
-    x_threshold = 10  # Můžete upravit podle potřeby
+    x_threshold = 15 
     
     # Procházení objektů a jejich centroidů
     for region in regionprops(labeled_image):
@@ -113,9 +113,12 @@ for im in images:
     
     # Počet jedinečných objektů
     unique_count = count_unique_objects(closed_image)
-    output[im] = 5-unique_count
+    count =5-unique_count
+    if count <0:
+        count =0
+    output[im] = count
     
-    print(f"{im}: {5-unique_count}")
+    print(f"{im}: {count}")
     
     write_output("output.csv", output)
     #visualize(image, gray, edges, fill_edges, filtered_image, closed_image)
