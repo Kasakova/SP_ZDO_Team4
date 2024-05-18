@@ -6,7 +6,7 @@ import numpy as np
 from skimage.measure import label, regionprops
 import skimage.io
 import os
-
+import cv2
 def visualize(image, gray, edges, fill_edges, filtered_image, closed_image):
     # Zobrazení výsledků
     plt.figure(figsize=(12, 8))
@@ -76,6 +76,7 @@ def count_unique_objects(binary_image):
     
     return unique_count
 
+
 # Hlavní část kódu
 images = os.listdir("../images/incision_couples/")
 output = {}
@@ -83,11 +84,27 @@ output = {}
 for im in images:
     # Konverze do šedotónu
     image = skimage.io.imread("../images/incision_couples/" + im)
+    
     gray = rgb2gray(image)
-   
+    # Aplikace Scharr filtru
+    scharrx = cv2.Scharr(gray, cv2.CV_64F, 1, 0)
+    scharry = cv2.Scharr(gray, cv2.CV_64F, 0, 1)
+    scharr = np.sqrt(scharrx**2 + scharry**2)
+
+    # Konverze zpět na 8-bitový obraz
+    scharr = cv2.convertScaleAbs(scharr)
+
+
+    # Použití morfologických operací pro odstranění malých hran
+    # Vytvoření kernelu
+    kernel = np.ones((5, 5), np.uint8)
+
+    # Dilatace následovaná erozí (otevírání)
+    opening = cv2.morphologyEx(gray, cv2.MORPH_OPEN, kernel)
+    
     edges = canny(gray)
-    structure = np.ones((4, 4), dtype=np.uint8)
-    edges_a = ndimage.binary_closing(edges, structure=structure)
+    structure = np.ones((4, 5), dtype=np.uint8)
+    edges_a = ndimage.binary_closing(edges , structure=structure)
    
     fill_edges = ndimage.binary_fill_holes(edges_a)
     
@@ -121,4 +138,4 @@ for im in images:
     print(f"{im}: {count}")
     
     write_output("output.csv", output)
-    #visualize(image, gray, edges, fill_edges, filtered_image, closed_image)
+    #visualize(image, scharr, edges , fill_edges, filtered_image, closed_image)
