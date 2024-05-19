@@ -7,6 +7,7 @@ from skimage.measure import label, regionprops
 import skimage.io
 import os
 import cv2
+from detekce_incize_stehy import detekce
 def visualize(image, gray, edges, fill_edges, filtered_image, closed_image):
     # Zobrazení výsledků
     plt.figure(figsize=(12, 8))
@@ -80,62 +81,65 @@ def count_unique_objects(binary_image):
 # Hlavní část kódu
 images = os.listdir("../images/incision_couples/")
 output = {}
-
+potential_stitch=5
 for im in images:
     # Konverze do šedotónu
     image = skimage.io.imread("../images/incision_couples/" + im)
     
     gray = rgb2gray(image)
-    # Aplikace Scharr filtru
-    scharrx = cv2.Scharr(gray, cv2.CV_64F, 1, 0)
-    scharry = cv2.Scharr(gray, cv2.CV_64F, 0, 1)
-    scharr = np.sqrt(scharrx**2 + scharry**2)
+    blurred = ndimage.gaussian_filter(gray, sigma=1)
+    # Aplikace adaptivního prahování s Gaussovým průměrem
+    adaptive_thresh = cv2.adaptiveThreshold((blurred* 255).astype('uint8'), 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 91, 10)
 
-    # Konverze zpět na 8-bitový obraz
-    scharr = cv2.convertScaleAbs(scharr)
+    # Detekce čar pomocí Houghovy transformace
+    lines = cv2.HoughLinesP(adaptive_thresh, 1, np.pi/180, threshold=50, minLineLength=50, maxLineGap=15)
+
+    if lines is  None:
+       output[im] = -1
+       print(f"{im}: {-1}")
+
+    else:
+        potential_stitch= detekce(image)
+        if potential_stitch == -1:
+            output[im] = -1
+            print(f"{im}: {-1}")
 
 
-    # Použití morfologických operací pro odstranění malých hran
-    # Vytvoření kernelu
-    kernel = np.ones((5, 5), np.uint8)
-
-    # Dilatace následovaná erozí (otevírání)
-    opening = cv2.morphologyEx(gray, cv2.MORPH_OPEN, kernel)
-    
-    edges = canny(gray)
-    structure = np.ones((4, 5), dtype=np.uint8)
-    edges_a = ndimage.binary_closing(edges , structure=structure)
-   
-    fill_edges = ndimage.binary_fill_holes(edges_a)
-    
-    label_image = ndimage.label(fill_edges)[0]
+        else:
+            edges = canny(gray)
+            structure = np.ones((4, 5), dtype=np.uint8)
+            edges_a = ndimage.binary_closing(edges , structure=structure)
         
-    # Filtrace objektů podle kulatosti
-    filtered_image = np.zeros_like(label_image)
-    for region in regionprops(label_image):
-        # Filtrace podle kulatosti
-        eccentricity = region.eccentricity
-        if eccentricity < 0.85:  # Pragmatická hodnota pro kulatost, můžete upravit podle potřeby
-            for coord in region.coords:
-                filtered_image[coord[0], coord[1]] = 255
-    
-    # Definice strukturovaného prvku
-    structure = np.ones((3, 3), dtype=np.uint8)  # 3x3 strukturovaný prvek, můžete upravit podle potřeby
+            fill_edges = ndimage.binary_fill_holes(edges_a)
+            
+            label_image = ndimage.label(fill_edges)[0]
+                
+            # Filtrace objektů podle kulatosti
+            filtered_image = np.zeros_like(label_image)
+            for region in regionprops(label_image):
+                # Filtrace podle kulatosti
+                eccentricity = region.eccentricity
+                if eccentricity < 0.85:  # Pragmatická hodnota pro kulatost, můžete upravit podle potřeby
+                    for coord in region.coords:
+                        filtered_image[coord[0], coord[1]] = 255
+            
+            # Definice strukturovaného prvku
+            structure = np.ones((3, 3), dtype=np.uint8)  # 3x3 strukturovaný prvek, můžete upravit podle potřeby
 
-    # Provádění morfologického uzavření (closing)
-    closed_image = ndimage.binary_opening(filtered_image, structure=structure)
-    
-    # Označení uzavřeného obrázku
-    closed_image_label = ndimage.label(closed_image)[0]
-    
-    # Počet jedinečných objektů
-    unique_count = count_unique_objects(closed_image)
-    count =5-unique_count
-    if count <0:
-        count =0
-    output[im] = count
-    
-    print(f"{im}: {count}")
-    
+            # Provádění morfologického uzavření (closing)
+            closed_image = ndimage.binary_opening(filtered_image, structure=structure)
+            
+            # Označení uzavřeného obrázku
+            closed_image_label = ndimage.label(closed_image)[0]
+            
+            # Počet jedinečných objektů
+            unique_count = count_unique_objects(closed_image)
+            count = 5-unique_count
+            if count <0:
+                count =0
+            output[im] = count
+            
+            print(f"{im}: {count}")
+        
     write_output("output.csv", output)
-    #visualize(image, scharr, edges , fill_edges, filtered_image, closed_image)
+    #visualize(image, gray, edges , fill_edges, filtered_image, closed_image)

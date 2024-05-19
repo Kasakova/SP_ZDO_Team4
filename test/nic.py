@@ -11,14 +11,6 @@ from skimage.color import rgb2gray
 from skimage import io, morphology
 from scipy import ndimage
 
-def list2dict(lines):
-    dict = {}
-    for line in lines:
-        spl = line.split(",")
-        if spl[0] != "filename":
-            dict[spl[0]] = spl[1]
-    return dict
-
 
 
 # Hlavní část kódu
@@ -50,7 +42,7 @@ for im in images:
     adaptive_thresh = cv2.adaptiveThreshold((blurred* 255).astype('uint8'), 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 91, 10)
 
     # Detekce čar pomocí Houghovy transformace
-    lines = cv2.HoughLinesP(adaptive_thresh, 1, np.pi/180, threshold=50, minLineLength=50, maxLineGap=15)
+    lines = cv2.HoughLinesP(adaptive_thresh, 1, np.pi/180, threshold=50, minLineLength=50, maxLineGap=10)
 
         # Vytvoření kopie obrázku pro vykreslení nalezených čar
     lines_image = np.copy(image)
@@ -59,14 +51,6 @@ for im in images:
     horizontal_lines = []
     if lines is not None:
         for line in lines:
-            x1, y1, x2, y2 = line[0]
-            # Výpočet úhlu čáry
-            angle = np.arctan2(y2 - y1, x2 - x1) * 180 / np.pi
-            if abs(angle) < 10:  # Povolená tolerance úhlu (vodorovné čáry)
-                horizontal_lines.append(line)
-
-        # Projdeme nalezené vodorovné čáry a vykreslíme je do kopie obrázku
-        for line in horizontal_lines:
             x1, y1, x2, y2 = line[0]
             cv2.line(lines_image, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
