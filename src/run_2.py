@@ -79,12 +79,12 @@ def process(images):
                 for region in regionprops(label_image):
                     # Filtrace podle kulatosti
                     eccentricity = region.eccentricity
-                    if eccentricity < 0.85:  # Pragmatická hodnota pro kulatost, můžete upravit podle potřeby
+                    if eccentricity < 0.85:  # Pragmatická hodnota pro kulatost
                         for coord in region.coords:
                             filtered_image[coord[0], coord[1]] = 255
                 
                 # Definice strukturovaného prvku
-                structure = np.ones((3, 3), dtype=np.uint8)  # 3x3 strukturovaný prvek, můžete upravit podle potřeby
+                structure = np.ones((3, 3), dtype=np.uint8)  # 3x3 strukturovaný prvek
 
                 # Provádění morfologického uzavření (closing)
                 closed_image = ndimage.binary_opening(filtered_image, structure=structure)
