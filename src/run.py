@@ -9,7 +9,8 @@ from skimage.segmentation import active_contour
 from skimage.filters import gaussian
 from skimage.color import rgb2gray
 import os
-from compare import comp
+from scipy import ndimage
+import cv2
 
 
 def write_output(file, output):
@@ -41,137 +42,69 @@ def threshold_test(image):
 
 def channel_test(image):
     plt.subplot(3, 2, 1)
-    plt.imshow(image[:,:,0])
-    # plt.show()
-    plt.subplot(3, 2, 2)
-    plt.imshow(image[:,:,1])
+    plt.imshow(image[:,:,0], cmap='gray')
+    plt.title('RGB - red')
+    plt.axis('off')
     # plt.show()
     plt.subplot(3, 2, 3)
-    plt.imshow(image[:,:,2])
+    plt.imshow(image[:,:,1], cmap='gray')
+    plt.title('RGB - green')
+    plt.axis('off')
+    # plt.show()
+    plt.subplot(3, 2, 5)
+    plt.imshow(image[:,:,2], cmap='gray')
+    plt.title('RGB - blue')
+    plt.axis('off')
     # plt.show()
 
     hsv_img = rgb2hsv(image)*255
-    plt.subplot(3, 2, 4)
-    plt.imshow(hsv_img[:,:,0])
+    plt.subplot(3, 2, 2)
+    plt.imshow(hsv_img[:,:,0], cmap='gray')
+    plt.title('HSV - hue')
+    plt.axis('off')
     # plt.show()
-    plt.subplot(3, 2, 5)
-    plt.imshow(hsv_img[:,:,1])
+    plt.subplot(3, 2, 4)
+    plt.imshow(hsv_img[:,:,1], cmap='gray')
+    plt.title('HSV - saturation')
+    plt.axis('off')
     # plt.show()
     plt.subplot(3, 2, 6)
-    plt.imshow(hsv_img[:,:,2])
+    plt.imshow(hsv_img[:,:,2], cmap='gray')
+    plt.title('HSV - value')
+    plt.axis('off')
     plt.show()
+
+    gray = rgb2gray(image)
+    plt.imshow(gray)
+    plt.title('Šedotónový obrázek')
+    plt.axis('off')
+    plt.show()
+    skimage.io.imsave("sedoton.png", img_as_ubyte(gray))
     return
 
 
 def thresholding(image):
-    # thresh = threshold_otsu(np.asarray(image[:,:,0]))
-    # bin1 = image[:,:,0] > thresh
-    # thresh = threshold_yen(image[:,:,1])
-    # bin2 = image[:,:,1] > thresh
-    # im = np.logical_and(bin1,bin2)
-    #
-    # hsv_img = rgb2hsv(image)*255
-    # block_size = 13
-    # binary_adaptive = hsv_img[:,:,2] > threshold_local(hsv_img[:,:,2], block_size)
-    # im = np.logical_or(im,binary_adaptive)
-    # im = (im.astype(int)+1)%2
-    #
-    # grim = rgb2gray(image) # sedy vychazi nejlip lmao proc jsem se srala s jednotlivejma kanalama (aspoň odstavecek do docu)
-    #
-    # thresh = threshold_otsu(np.asarray(grim))
-    # bin1 = grim > thresh
-    # thresh = threshold_yen(grim)
-    # bin2 = grim > thresh
-    # im = np.logical_and(bin1,bin2)
-    #
-    # block_size = 13
-    # binary_adaptive = grim > threshold_local(grim, block_size)
-    # im = np.logical_or(im,binary_adaptive)
-    # im = (im.astype(int)+1)%2
-    #
-    # # kernel = np.ones((3,3))
-    # # im = morphology.binary_dilation(im, kernel)
-    #
-    # labelled = morphology.label(im)
-    # rp = measure.regionprops(labelled)
-    # size = [i.area for i in rp]
-    # size.sort()
-    # try:
-    #     out = morphology.remove_small_objects(im.astype(bool), min_size=size[-1]*0.8)
-    # except IndexError:
-    #     out = im
-    #
-    # kernel = np.ones((3,3))
-    # out = morphology.binary_dilation(out, kernel)
-    #
-    # labelled = morphology.label(im)
-    # rp = measure.regionprops(labelled)
-    # size = [i.area for i in rp]
-    # size.sort()
-    # try:
-    #     out = morphology.remove_small_objects(im.astype(bool), min_size=size[-1]*0.8)
-    # except IndexError:
-    #     out = im
-    grim = rgb2gray(image) # sedy vychazi nejlip lmao proc jsem se srala s jednotlivejma kanalama (aspoň odstavecek do docu)
+    gray = rgb2gray(image)
+    blurred = ndimage.gaussian_filter(gray, sigma=1)
+    # Aplikace adaptivního prahování s Gaussovým průměrem
+    adaptive_thresh = cv2.adaptiveThreshold((blurred * 255).astype('uint8'), 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                            cv2.THRESH_BINARY_INV, 91, 10)
 
-    # thresh = threshold_otsu(np.asarray(grim))
-    # im = grim > thresh
-    #
-    # block_size = 13
-    # binary_adaptive = grim > threshold_local(grim, block_size)
-    # im = np.logical_or(im,binary_adaptive)
-    # im = (im.astype(int)+1)%2
+    # První prahování
+    _, binary_thresh1 = cv2.threshold(adaptive_thresh, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
 
-    thresh = threshold_otsu(np.asarray(grim))
-    im = grim < thresh
+    # Druhé prahování s jinou hodnotou prahu
+    _, binary_thresh2 = cv2.threshold(adaptive_thresh, 200, 255, cv2.THRESH_BINARY)
 
-    block_size = 15
-    binary_adaptive = grim < threshold_local(grim, block_size)
-    im = np.logical_and(im,binary_adaptive)
-    # im = (im.astype(int)+1)%2
+    # Kombinace prahování
+    combined_thresh = cv2.bitwise_or(binary_thresh1, binary_thresh2)
 
-    labelled = morphology.label(im)
+    labelled = morphology.label(combined_thresh)
     rp = measure.regionprops(labelled)
     size = [i.area for i in rp]
     size.sort()
-    try:
-        im = morphology.remove_small_objects(im, min_size=size[-1] * 0.3)
-    except IndexError:
-        im = im
-
-    kernel = np.ones((3,3))
-    im = morphology.binary_dilation(im, kernel)
-
-    labelled = morphology.label(im)
-    rp = measure.regionprops(labelled)
-    size = [i.area for i in rp]
-    size.sort()
-    try:
-        out = morphology.remove_small_objects(im, min_size=size[-1]*0.8)
-    except IndexError:
-        out = im
+    out = morphology.remove_small_objects(combined_thresh.astype(bool), min_size=size[-1] * 0.3)
     return out
-
-def snake(img):
-    s = np.linspace(0, 2 * np.pi, 400)
-    r = img.shape[0]/2 + img.shape[0]/2 * np.sin(s)
-    c = img.shape[1]/2 + img.shape[1]/2* np.cos(s)
-    init = np.array([r, c]).T
-
-    # snake
-    snake = active_contour(gaussian(img, 3),
-                           init, alpha=0.15, beta=30, gamma=0.00001,
-                           coordinates='rc')
-    # visualization
-    fig, ax = plt.subplots(figsize=(7, 7))
-    ax.imshow(img, cmap=plt.cm.gray)
-    ax.plot(init[:, 1], init[:, 0], '--r', lw=3)
-    ax.plot(snake[:, 1], snake[:, 0], '-b', lw=3)
-    ax.set_xticks([]), ax.set_yticks([])
-    ax.axis([0, img.shape[1], img.shape[0], 0])
-
-    plt.show()
-    return
 
 
 def kostra(im):
@@ -185,7 +118,7 @@ def kostra(im):
 def min_neighbor(im, x,y):
     vyrez = im[x-1:x+2,y-1:y+2].copy()
     vyrez[1,1] =100
-    return np.argmin(vyrez)#0-8 mimo 4 #TODO preferovat cestu doprava?
+    return np.argmin(vyrez)#0-8 mimo 4
 
 
 def posun(index):
@@ -237,18 +170,15 @@ def remove_incision(im):
     im[incision] = 0
 
     kernel = np.ones((5,5))
-    # kernel = morphology.diamond(1)
-
     im = morphology.binary_dilation(im, kernel)
 
     labelled = morphology.label(im)
     rp = measure.regionprops(labelled)
-
     size = [i.area for i in rp]
     size.sort()
     if len(size)!=0:
-        out = morphology.remove_small_objects(im.astype(bool), min_size=size[-1]*0.5)
-        out = morphology.remove_small_objects(out.astype(bool), min_size=im.shape[0]*0.3*kernel.shape[0])# TODO nejak odstranit naopak velky objekty?
+        out = morphology.remove_small_objects(im.astype(bool), min_size=size[-1]*0.6)
+        out = morphology.remove_small_objects(out.astype(bool), min_size=im.shape[0]*0.3*kernel.shape[0])
     else:
         out = im
     return out,incision
@@ -257,31 +187,29 @@ def remove_incision(im):
 def vizualizace(img,kostra, incize):
     img[kostra,:] = [255,0,0]
     img[incize,:] = [0,255,0]
-    # plt.imshow(img)
-    # plt.show()
     return img
+
+
 def process(images):
     output ={}
     for im in images:
         img_orig = skimage.io.imread("../images/incision_couples/" + im)
-        # img = snake(img_orig) # vraci nesmysly
         # threshold_test(img_orig)
         # channel_test(img_orig)
         img = thresholding(img_orig)
-        skimage.io.imsave("../images/threshold/"+im.split(".")[0]+".png", img_as_ubyte(img))
+        # skimage.io.imsave("../images/threshold/"+im.split(".")[0]+".png", img_as_ubyte(img))
         kost = kostra(img)
-        skimage.io.imsave("../images/skeletons/"+im.split(".")[0]+".png", img_as_ubyte(kost))
+        # skimage.io.imsave("../images/skeletons/"+im.split(".")[0]+".png", img_as_ubyte(kost))
         stehy,incision = remove_incision(kost)
-        skimage.io.imsave("../images/incisionless/"+im.split(".")[0]+".png", img_as_ubyte(stehy))
-        if args.v:
-            viz = vizualizace(img_orig, morphology.skeletonize(stehy), incision)
-            skimage.io.imsave("../images/visualization/" + im.split(".")[0]+".png", img_as_ubyte(viz))
+        # skimage.io.imsave("../images/incisionless/"+im.split(".")[0]+".png", img_as_ubyte(stehy))
         labels, num = morphology.label(stehy, return_num=True)
         output[im] = num
+        if args.v:
+            if num!=-1:
+                viz = vizualizace(img_orig, morphology.skeletonize(stehy), incision)
+                skimage.io.imsave("../images/visualization/" + im.split(".")[0]+".png", img_as_ubyte(viz))
     return output
 
-# TODO metoda hodne loops x moc velka cerna plocha -> -1,
-# skimage.segmentation.clear_border
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -292,16 +220,9 @@ if __name__ == "__main__":
     out_file = args.out
     in_files = args.input
 
-    # output = process(in_files)#obrazky z args
+    output = process(in_files)#obrazky z args
     output = process(os.listdir("../images/incision_couples/"))#vsechny obrazky
 
+    write_output(out_file, output)
 
-    anot = "anotace.csv"
-    vyst = "output.csv"
-    write_output(out_file , output)
-    with open(anot, encoding="UTF8") as f1:
-        real= f1.readlines()
-    with open(vyst, encoding="UTF8") as f2:
-        pred = f2.readlines()
-    print(comp(real, pred))
 
