@@ -79,18 +79,18 @@ def process(images):
                 for region in regionprops(label_image):
                     # Filtrace podle kulatosti
                     eccentricity = region.eccentricity
-                    if eccentricity < 0.85:  # Pragmatická hodnota pro kulatost
+                    if eccentricity < 0.85:  # Pragmatická hodnota pro kulatost, můžete upravit podle potřeby
                         for coord in region.coords:
                             filtered_image[coord[0], coord[1]] = 255
                 
                 # Definice strukturovaného prvku
-                structure = np.ones((3, 3), dtype=np.uint8)  # 3x3 strukturovaný prvek
+                structure = np.ones((3, 3), dtype=np.uint8)  # 3x3 strukturovaný prvek, můžete upravit podle potřeby
 
-                # Provádění morfologického uzavření (closing)
-                closed_image = ndimage.binary_opening(filtered_image, structure=structure)
+                # Provádění morfologického otevření
+                opened_image = ndimage.binary_opening(filtered_image, structure=structure)
                 
                 # Počet jedinečných objektů
-                unique_count = count_unique_objects(closed_image)
+                unique_count = count_unique_objects(opened_image)
                 count = 5-unique_count
                 if count <0:
                     count =0
@@ -103,7 +103,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     out_file = args.out
     in_files = args.input
-
     output = process(in_files)#obrazky z args
+
 
     write_output("output.csv", output)
