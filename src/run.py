@@ -11,6 +11,7 @@ from skimage.color import rgb2gray
 import os
 from scipy import ndimage
 import cv2
+from detekce_incize_stehy import detekce
 
 
 def write_output(file, output):
@@ -194,20 +195,31 @@ def process(images):
     output ={}
     for im in images:
         img_orig = skimage.io.imread("../images/incision_couples/" + im)
-        # threshold_test(img_orig)
-        # channel_test(img_orig)
-        img = thresholding(img_orig)
-        # skimage.io.imsave("../images/threshold/"+im.split(".")[0]+".png", img_as_ubyte(img))
-        kost = kostra(img)
-        # skimage.io.imsave("../images/skeletons/"+im.split(".")[0]+".png", img_as_ubyte(kost))
-        stehy,incision = remove_incision(kost)
-        # skimage.io.imsave("../images/incisionless/"+im.split(".")[0]+".png", img_as_ubyte(stehy))
-        labels, num = morphology.label(stehy, return_num=True)
-        output[im] = num
-        if args.v:
-            if num!=-1:
-                viz = vizualizace(img_orig, morphology.skeletonize(stehy), incision)
-                skimage.io.imsave("../images/visualization/" + im.split(".")[0]+".png", img_as_ubyte(viz))
+        gray = rgb2gray(img_orig)
+        blurred = ndimage.gaussian_filter(gray, sigma=1)
+        # Aplikace adaptivního prahování s Gaussovým průměrem
+        adaptive_thresh = cv2.adaptiveThreshold((blurred * 255).astype('uint8'), 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                                cv2.THRESH_BINARY_INV, 91, 10)
+
+        # Detekce čar pomocí Houghovy transformace
+        lines = cv2.HoughLinesP(adaptive_thresh, 1, np.pi / 180, threshold=50, minLineLength=50, maxLineGap=15)
+
+        if lines is None:
+            output[im] = -1
+
+        else:
+            potential_stitch = detekce(img_orig)
+            if potential_stitch == -1:
+                output[im] = -1
+            else:
+                img = thresholding(img_orig)
+                kost = kostra(img)
+                stehy,incision = remove_incision(kost)
+                labels, num = morphology.label(stehy, return_num=True)
+                output[im] = num
+                if args.v:
+                    viz = vizualizace(img_orig, morphology.skeletonize(stehy), incision)
+                    skimage.io.imsave("../images/visualization/" + im.split(".")[0]+".png", img_as_ubyte(viz))
     return output
 
 
@@ -221,8 +233,7 @@ if __name__ == "__main__":
     in_files = args.input
 
     output = process(in_files)#obrazky z args
-    output = process(os.listdir("../images/incision_couples/"))#vsechny obrazky
 
-    write_output(out_file, output)
+    write_output("output.csv", output)
 
 

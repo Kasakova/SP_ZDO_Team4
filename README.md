@@ -25,5 +25,5 @@ python run.py output.csv -v incision001.jpg incision005.png
 ## Spuštění metody 2
 
   ```sh
-python run2.py {výstupní soubor} {seznam obrázků pro zpracování}
+python run_2.py {výstupní soubor} {seznam obrázků pro zpracování}
   ```

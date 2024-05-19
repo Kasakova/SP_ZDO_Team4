@@ -99,12 +99,11 @@ def process(images):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('out', type=str)
-    parser.add_argument('-v', action='store_true', required=False)
     parser.add_argument('input', nargs='+', type=str)
     args = parser.parse_args()
     out_file = args.out
     in_files = args.input
+
     output = process(in_files)#obrazky z args
-    output = process(os.listdir("../images/incision_couples/"))#vsechny obrazky
 
     write_output("output.csv", output)
