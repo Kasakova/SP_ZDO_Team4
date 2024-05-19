@@ -50,7 +50,8 @@ def process(images):
     for im in images:
         # Konverze do šedotónu
         image = skimage.io.imread("../images/incision_couples/" + im)
-        
+        if image.shape[0] > image.shape[1]:
+           image = skimage.transform.rotate(image, 90, resize=True,)
         gray = rgb2gray(image)
         blurred = ndimage.gaussian_filter(gray, sigma=1)
         # Aplikace adaptivního prahování s Gaussovým průměrem
