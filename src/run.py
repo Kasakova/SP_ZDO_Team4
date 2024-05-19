@@ -195,6 +195,8 @@ def process(images):
     output ={}
     for im in images:
         img_orig = skimage.io.imread("../images/incision_couples/" + im)
+        if img_orig.shape[0] > img_orig.shape[1]:
+           img_orig = skimage.transform.rotate(img_orig, 90, resize=True,)
         gray = rgb2gray(img_orig)
         blurred = ndimage.gaussian_filter(gray, sigma=1)
         # Aplikace adaptivního prahování s Gaussovým průměrem
